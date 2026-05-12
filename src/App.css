@@ -1,0 +1,482 @@
+.aplicacion {
+  width: min(1360px, calc(100% - 28px));
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 22px 0 34px;
+  display: grid;
+  gap: 18px;
+}
+
+.barra-superior,
+.tablero-viaje,
+.metricas,
+.resumen-analitico {
+  display: grid;
+  gap: 14px;
+}
+
+.barra-superior {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.tablero-viaje {
+  grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.65fr);
+  align-items: stretch;
+}
+
+.panel-operacion {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.etiqueta {
+  margin: 0 0 4px;
+  color: #0f766e;
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  color: #0f172a;
+  font-size: clamp(2rem, 4vw, 3.8rem);
+  line-height: 0.96;
+}
+
+h2 {
+  margin-bottom: 4px;
+  color: #111827;
+  font-size: 1rem;
+}
+
+.tarjeta {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+}
+
+.estado-riesgo {
+  min-width: 164px;
+  min-height: 46px;
+  padding: 0 16px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #0f172a;
+  font-weight: 850;
+}
+
+.estado-riesgo span {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #22c55e;
+  box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.14);
+}
+
+.estado-riesgo.medio span {
+  background: #f59e0b;
+  box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.16);
+}
+
+.estado-riesgo.alto span,
+.estado-riesgo.alarma span {
+  background: #ef4444;
+  box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.18);
+}
+
+.mapa-panel,
+.camara-panel,
+.analisis-datos,
+.tabla-eventos,
+.estado-sistema {
+  overflow: hidden;
+}
+
+.mapa-panel {
+  min-height: 560px;
+  padding: 14px;
+  display: grid;
+  grid-template-rows: auto minmax(420px, 1fr);
+  gap: 12px;
+}
+
+.mapa-ruta {
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #dbeafe;
+}
+
+.leaflet-container {
+  font: inherit;
+}
+
+.titulo-panel,
+.titulo-tabla {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.titulo-panel span,
+.titulo-tabla span,
+.metrica span,
+.resumen-analitico span {
+  color: #64748b;
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+
+.titulo-panel strong {
+  color: #0f766e;
+  font-size: 1.1rem;
+}
+
+.camara-panel {
+  padding: 10px;
+}
+
+.camara-panel.alarma {
+  box-shadow:
+    0 0 0 5px rgba(239, 68, 68, 0.16),
+    0 18px 50px rgba(127, 29, 29, 0.18);
+}
+
+.zona-video {
+  position: relative;
+  min-height: 240px;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.88), rgba(17, 94, 89, 0.82)),
+    #111827;
+}
+
+.video-camara,
+.lienzo-deteccion {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.video-camara {
+  object-fit: cover;
+}
+
+.lienzo-deteccion {
+  pointer-events: none;
+}
+
+.espejo {
+  transform: scaleX(-1);
+}
+
+.cubierta-video {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  padding: 20px;
+  color: #f8fafc;
+  text-align: center;
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.cubierta-video strong {
+  font-size: clamp(1.2rem, 4vw, 2rem);
+}
+
+.cubierta-video span {
+  color: #dbeafe;
+  font-weight: 750;
+}
+
+.acciones {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.boton {
+  min-height: 46px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #0f172a;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+}
+
+.boton:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.boton:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.boton.primario {
+  background: #10b981;
+  box-shadow: 0 14px 30px rgba(16, 185, 129, 0.22);
+}
+
+.boton.secundario {
+  background: #e0f2fe;
+  box-shadow: 0 14px 30px rgba(14, 165, 233, 0.12);
+}
+
+.boton.peligro {
+  background: #ef4444;
+  color: #fff;
+}
+
+.boton.peligro-suave {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.boton.oscuro {
+  background: #0f172a;
+  color: #f8fafc;
+  grid-column: 1 / -1;
+}
+
+.estado-sistema {
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.estado-sistema p,
+.estado-sistema small,
+.recomendacion {
+  margin-bottom: 0;
+  color: #475569;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.estado-sistema small {
+  color: #0f766e;
+}
+
+.metricas {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.metrica {
+  min-height: 100px;
+  padding: 14px;
+  display: grid;
+  align-content: space-between;
+  gap: 10px;
+}
+
+.metrica strong {
+  color: #0f172a;
+  font-size: clamp(1rem, 2vw, 1.45rem);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.analisis-datos {
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+}
+
+.nivel-indice {
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(34, 197, 94, 0.14);
+  color: #15803d;
+  font-size: 0.86rem;
+}
+
+.nivel-indice.medio {
+  background: rgba(245, 158, 11, 0.16);
+  color: #92400e;
+}
+
+.nivel-indice.alto {
+  background: rgba(239, 68, 68, 0.14);
+  color: #b91c1c;
+}
+
+.resumen-analitico {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.resumen-analitico div {
+  min-height: 76px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+  display: grid;
+  align-content: space-between;
+}
+
+.resumen-analitico strong {
+  color: #0f172a;
+  font-size: 1.15rem;
+}
+
+.tabla-eventos {
+  overflow: hidden;
+}
+
+.titulo-tabla {
+  padding: 16px;
+}
+
+.contenedor-tabla {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 13px 16px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  color: #334155;
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  color: #64748b;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.chip-alerta {
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: rgba(245, 158, 11, 0.14);
+  color: #92400e;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.chip-alerta.alto {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.chip-alerta.alarma {
+  background: #ef4444;
+  color: #fff;
+}
+
+.sin-eventos {
+  color: #94a3b8;
+  text-align: center;
+}
+
+audio {
+  display: none;
+}
+
+@media (max-width: 1180px) {
+  .metricas,
+  .resumen-analitico {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .barra-superior,
+  .tablero-viaje {
+    grid-template-columns: 1fr;
+  }
+
+  .mapa-panel {
+    min-height: auto;
+    grid-template-rows: auto minmax(360px, 48vh);
+  }
+
+  .zona-video {
+    min-height: 260px;
+  }
+}
+
+@media (max-width: 640px) {
+  .aplicacion {
+    width: min(100% - 18px, 1360px);
+    padding: 16px 0 28px;
+  }
+
+  .barra-superior {
+    gap: 12px;
+  }
+
+  .estado-riesgo,
+  .acciones,
+  .boton {
+    width: 100%;
+  }
+
+  .acciones,
+  .metricas,
+  .resumen-analitico {
+    grid-template-columns: 1fr;
+  }
+
+  .titulo-panel,
+  .titulo-tabla {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .mapa-panel {
+    padding: 10px;
+    grid-template-rows: auto minmax(320px, 44vh);
+  }
+
+  .zona-video {
+    aspect-ratio: 4 / 5;
+    min-height: 300px;
+  }
+
+  th,
+  td {
+    padding: 12px;
+  }
+}

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MicroSueño AI">
+  <rect width="512" height="512" rx="112" fill="#0f172a"/>
+  <circle cx="256" cy="220" r="118" fill="#10b981"/>
+  <path fill="#e0f2fe" d="M152 334c22 47 61 74 104 74s82-27 104-74c-33 13-68 20-104 20s-71-7-104-20Z"/>
+  <circle cx="214" cy="216" r="18" fill="#0f172a"/>
+  <circle cx="298" cy="216" r="18" fill="#0f172a"/>
+  <path fill="none" stroke="#0f172a" stroke-linecap="round" stroke-width="22" d="M224 278c20 14 44 14 64 0"/>
+  <path fill="none" stroke="#38bdf8" stroke-linecap="round" stroke-width="30" d="M352 126h70M384 76h58M382 176h42"/>
+</svg>
