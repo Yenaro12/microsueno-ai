@@ -1,0 +1,168 @@
+.landing-container {
+  min-height: 100vh;
+  background: #ffffff;
+  color: #0f172a;
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.landing-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 5%;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.logo span {
+  color: #2563eb;
+}
+
+.landing-header nav {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+}
+
+.landing-header nav a {
+  text-decoration: none;
+  color: #64748b;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.landing-header nav a:hover {
+  color: #2563eb;
+}
+
+.landing-hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 80px 5%;
+  background: radial-gradient(circle at top right, #eff6ff 0%, #ffffff 50%);
+}
+
+.landing-hero h1 {
+  font-size: 3.5rem;
+  font-weight: 800;
+  max-width: 900px;
+  line-height: 1.1;
+  margin-bottom: 24px;
+}
+
+.landing-hero h1 span {
+  color: #2563eb;
+}
+
+.landing-hero p {
+  font-size: 1.25rem;
+  color: #64748b;
+  max-width: 600px;
+  margin-bottom: 64px;
+}
+
+.login-options {
+  width: 100%;
+  max-width: 1000px;
+}
+
+.login-options h2 {
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #2563eb;
+  margin-bottom: 32px;
+}
+
+.grid-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.option-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  padding: 40px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.option-card:hover {
+  border-color: #2563eb;
+  transform: translateY(-8px);
+  box-shadow: 0 20px 25px -5px rgba(37, 99, 235, 0.1);
+}
+
+.option-card .icon {
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+}
+
+.option-card h3 {
+  font-size: 1.25rem;
+  margin-bottom: 12px;
+}
+
+.option-card p {
+  font-size: 0.875rem;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.btn-primary {
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.2s;
+}
+
+.option-card:hover .btn-primary {
+  background: #2563eb;
+}
+
+.btn-outline {
+  border: 1px solid #e2e8f0;
+  background: transparent;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.landing-footer {
+  padding: 40px;
+  text-align: center;
+  border-top: 1px solid #f1f5f9;
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 768px) {
+  .grid-options {
+    grid-template-columns: 1fr;
+  }
+  .landing-hero h1 {
+    font-size: 2.5rem;
+  }
+}

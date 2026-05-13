@@ -60,8 +60,19 @@ export function useAuth() {
       ...usuarioBase,
       correo: correoLimpio,
       nombre: usuarioBase.nombre || correoLimpio.split('@')[0],
+      role: 'driver' // Default role
     }
     guardarSesion(usuarioSesion)
+    return { ok: true }
+  }, [guardarSesion])
+
+  const loginAsRole = useCallback((role) => {
+    const demos = {
+      driver: { nombre: 'Chofer Demo', correo: 'chofer@microsueno.ai', role: 'driver' },
+      manager: { nombre: 'Manager de Flota', correo: 'manager@microsueno.ai', role: 'manager' },
+      director: { nombre: 'Director Ops', correo: 'director@microsueno.ai', role: 'director' }
+    }
+    guardarSesion(demos[role] || demos.driver)
     return { ok: true }
   }, [guardarSesion])
 
@@ -72,7 +83,7 @@ export function useAuth() {
       return { ok: false, mensaje: 'Completa nombre, correo y contrasena.' }
     }
 
-    guardarSesion({ nombre: nombreLimpio, correo: correoLimpio })
+    guardarSesion({ nombre: nombreLimpio, correo: correoLimpio, role: 'driver' })
     return { ok: true }
   }, [guardarSesion])
 
@@ -84,7 +95,9 @@ export function useAuth() {
   return {
     usuario: sesion.usuario,
     autenticado: sesion.autenticado,
+    role: sesion.usuario?.role || 'driver',
     iniciarSesion,
+    loginAsRole,
     registrarUsuario,
     cerrarSesion,
   }

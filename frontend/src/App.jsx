@@ -1,26 +1,21 @@
-import LoginView from './components/LoginView'
-import RegisterView from './components/RegisterView'
+import LandingPage from './features/landing/LandingPage'
 import AdminPage from './features/admin/AdminPage'
 import AuthenticatedApp from './features/driver/AuthenticatedApp'
-import { useAppRoute } from './hooks/useAppRoute'
 import { useAuth } from './hooks/useAuth'
 
 function App() {
   const auth = useAuth()
-  const navegacion = useAppRoute()
-
-  if (navegacion.esAdmin) {
-    return <AdminPage onBackToApp={() => navegacion.navegar('/')} />
-  }
 
   if (!auth.autenticado) {
-    return navegacion.ruta === '/registro' ? (
-      <RegisterView onRegister={auth.registrarUsuario} onGoLogin={() => navegacion.navegar('/')} />
-    ) : (
-      <LoginView onLogin={auth.iniciarSesion} onGoRegister={() => navegacion.navegar('/registro')} />
-    )
+    return <LandingPage onLoginAs={auth.loginAsRole} />
   }
 
+  // Si es manager o director, va al AdminPage
+  if (auth.role === 'manager' || auth.role === 'director') {
+    return <AdminPage onBackToApp={auth.cerrarSesion} />
+  }
+
+  // Por defecto (driver) va a la app de detección
   return <AuthenticatedApp auth={auth} />
 }
 
