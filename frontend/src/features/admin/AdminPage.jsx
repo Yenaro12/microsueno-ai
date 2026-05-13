@@ -3,6 +3,14 @@ import { obtenerConductoresAdmin, obtenerResumenConductorAdmin } from '../../ser
 import { suscribirMonitoreoAdmin } from '../../services/supabaseRealtimeService'
 import AdminDriverPanel from './AdminDriverPanel'
 import AdminEmployeeSelector from './AdminEmployeeSelector'
+import AnalyticsDashboard from './AnalyticsDashboard'
+import DispatchPlanner from './DispatchPlanner'
+
+const TABS = [
+  { id: 'panel', label: 'Panel' },
+  { id: 'analytics', label: 'Análisis' },
+  { id: 'planner', label: 'Planeación' },
+]
 
 function AdminPage({ onBackToApp }) {
   const [conductores, setConductores] = useState([])
@@ -10,6 +18,7 @@ function AdminPage({ onBackToApp }) {
   const [resumen, setResumen] = useState(null)
   const [cargando, setCargando] = useState(false)
   const [mensaje, setMensaje] = useState('Panel listo para recibir datos.')
+  const [tabActiva, setTabActiva] = useState('panel')
   const refrescoRealtimeRef = useRef(null)
 
   const cargarConductores = useCallback(async () => {
@@ -17,7 +26,11 @@ function AdminPage({ onBackToApp }) {
     const respuesta = await obtenerConductoresAdmin()
     if (respuesta.ok) {
       setConductores(respuesta.data)
-      setMensaje(respuesta.data.length ? 'Conductores cargados desde API local.' : 'No hay conductores con eventos todavia.')
+      setMensaje(
+        respuesta.data.length
+          ? 'Conductores cargados desde API local.'
+          : 'No hay conductores con eventos todavia.',
+      )
     } else {
       setMensaje(`API local no disponible: ${respuesta.error?.message || 'sin detalle'}`)
     }
@@ -29,7 +42,6 @@ function AdminPage({ onBackToApp }) {
       setResumen(null)
       return
     }
-
     setCargando(true)
     const respuesta = await obtenerResumenConductorAdmin(driverId)
     if (respuesta.ok) {
@@ -66,12 +78,16 @@ function AdminPage({ onBackToApp }) {
       onViaje: programarRefresco,
       onEstado: setMensaje,
     })
-
     return () => {
       cancelar()
       window.clearTimeout(refrescoRealtimeRef.current)
     }
   }, [driverIdSeleccionado, programarRefresco])
+
+  const seleccionarConductorDesdeDashboard = useCallback((id) => {
+    setDriverIdSeleccionado(id)
+    setTabActiva('panel')
+  }, [])
 
   return (
     <main className="admin-screen">
@@ -84,24 +100,49 @@ function AdminPage({ onBackToApp }) {
         <button type="button" onClick={onBackToApp}>Volver a app</button>
       </header>
 
-      <section className="admin-layout">
-        <aside className="admin-sidebar">
-          <AdminEmployeeSelector
-            conductores={conductores}
-            conductorSeleccionado={driverIdSeleccionado}
-            cargando={cargando}
-            onSeleccionar={setDriverIdSeleccionado}
-            onRefrescar={cargarConductores}
-          />
-          <section className="admin-card admin-realtime">
-            <span className="admin-label">Realtime</span>
-            <p>{mensaje}</p>
-            <small>Preparado para escuchar cambios en Supabase `trips` y `events`.</small>
-          </section>
-        </aside>
+      <nav className="admin-tabs">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`admin-tab${tabActiva === tab.id ? ' admin-tab--active' : ''}`}
+            onClick={() => setTabActiva(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
 
-        <AdminDriverPanel resumen={resumen} />
-      </section>
+      {tabActiva === 'panel' && (
+        <section className="admin-layout">
+          <aside className="admin-sidebar">
+            <AdminEmployeeSelector
+              conductores={conductores}
+              conductorSeleccionado={driverIdSeleccionado}
+              cargando={cargando}
+              onSeleccionar={setDriverIdSeleccionado}
+              onRefrescar={cargarConductores}
+            />
+            <section className="admin-card admin-realtime">
+              <span className="admin-label">Realtime</span>
+              <p>{mensaje}</p>
+              <small>Preparado para escuchar cambios en Supabase `trips` y `events`.</small>
+            </section>
+          </aside>
+          <AdminDriverPanel resumen={resumen} />
+        </section>
+      )}
+
+      {tabActiva === 'analytics' && (
+        <AnalyticsDashboard
+          driverId={driverIdSeleccionado}
+          onSeleccionarConductor={seleccionarConductorDesdeDashboard}
+        />
+      )}
+
+      {tabActiva === 'planner' && (
+        <DispatchPlanner />
+      )}
     </main>
   )
 }
