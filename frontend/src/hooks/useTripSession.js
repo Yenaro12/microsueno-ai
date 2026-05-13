@@ -5,12 +5,14 @@ import { calcularIndiceRiesgo, clasificarRiesgo, obtenerRecomendacion } from '..
 import { useLocalStorage } from './useLocalStorage'
 import { crearViaje, finalizarViajeBackend } from '../services/tripService'
 import { guardarEventoBackend } from '../services/eventService'
+import { normalizarConductor } from '../utils/driverIdentity'
 
-export function useTripSession({ ubicacionActual, distanciaKm, onMessage } = {}) {
+export function useTripSession({ ubicacionActual, distanciaKm, onMessage, conductor } = {}) {
   const [eventosDetectados, setEventosDetectados] = useLocalStorage(STORAGE_KEYS.EVENTOS_VIAJE, [])
   const eventosRef = useRef(eventosDetectados)
   const idViajeRef = useRef('')
   const horaInicioViajeRef = useRef('')
+  const conductorRef = useRef(normalizarConductor(conductor))
 
   const [viajeActivo, setViajeActivo] = useState(false)
   const [idViaje, setIdViaje] = useState('')
@@ -21,6 +23,10 @@ export function useTripSession({ ubicacionActual, distanciaKm, onMessage } = {})
   useEffect(() => {
     eventosRef.current = eventosDetectados
   }, [eventosDetectados])
+
+  useEffect(() => {
+    conductorRef.current = normalizarConductor(conductor)
+  }, [conductor])
 
   useEffect(() => {
     if (!viajeActivo) return undefined
@@ -51,10 +57,14 @@ export function useTripSession({ ubicacionActual, distanciaKm, onMessage } = {})
 
   const registrarEvento = useCallback((datos) => {
     const fecha = new Date()
+    const conductorActual = conductorRef.current
     const eventoBase = {
       id: crearId('evento'),
       idViaje: idViajeRef.current || idViaje || 'sin-viaje',
       horaInicioViaje: horaInicioViajeRef.current || horaInicioViaje,
+      driverId: conductorActual.driverId,
+      driverName: conductorActual.driverName,
+      driverEmail: conductorActual.driverEmail,
       horaEvento: formatoHora(fecha),
       fechaHoraEvento: formatoFechaHora(fecha),
       fechaEventoISO: fecha.toISOString(),
@@ -84,6 +94,7 @@ export function useTripSession({ ubicacionActual, distanciaKm, onMessage } = {})
     if (viajeActivo) return
     const fechaInicio = new Date()
     const fallbackId = crearId('viaje')
+    const conductorActual = conductorRef.current
     let idBackend = fallbackId
 
     await desbloquearAudio?.()
@@ -92,8 +103,10 @@ export function useTripSession({ ubicacionActual, distanciaKm, onMessage } = {})
     setEventosDetectados([])
 
     const respuesta = await crearViaje({
+      id: fallbackId,
       startedAt: fechaInicio.toISOString(),
       status: 'active',
+      ...conductorActual,
     })
 
     if (respuesta.ok && respuesta.data?.id) {
@@ -161,9 +174,11 @@ export function useTripSession({ ubicacionActual, distanciaKm, onMessage } = {})
 
     const analisis = obtenerAnalisisViaje(tiempoEventoActual)
     const respuesta = await finalizarViajeBackend(idViajeRef.current || idViaje, {
+      startedAt: horaInicioViajeRef.current || horaInicioViaje,
       finishedAt: fechaFin,
       riskIndex: analisis.indiceRiesgo,
       distanceKm: Number((distanciaKm || 0).toFixed(3)),
+      ...conductorRef.current,
     })
 
     if (respuesta.ok) {
@@ -173,7 +188,7 @@ export function useTripSession({ ubicacionActual, distanciaKm, onMessage } = {})
     }
 
     onMessage?.('Viaje finalizado. Reporte listo para exportar.')
-  }, [distanciaKm, idViaje, obtenerAnalisisViaje, onMessage, viajeActivo])
+  }, [distanciaKm, horaInicioViaje, idViaje, obtenerAnalisisViaje, onMessage, viajeActivo])
 
   const limpiarEventos = useCallback(() => {
     eventosRef.current = []

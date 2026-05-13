@@ -1,21 +1,28 @@
 import { readStorage, updateStorage } from '../utils/fileStorage.js'
+import { normalizeEventPayload } from '../contracts/eventContract.js'
 
 const crearId = (prefijo) => `${prefijo}-${Date.now()}-${Math.random().toString(16).slice(2)}`
 
 export async function saveEvent(eventData) {
+  const payload = normalizeEventPayload(eventData)
   const event = {
-    id: eventData.id || crearId('event'),
-    tripId: eventData.tripId || 'sin-viaje',
-    time: eventData.time || new Date().toISOString(),
-    readableTime: eventData.readableTime || new Date(eventData.time || Date.now()).toLocaleString('es-MX'),
-    type: eventData.type,
-    level: eventData.level,
-    delta: Number(eventData.delta ?? 0),
-    duration: Number(eventData.duration ?? 0),
-    lat: eventData.lat ?? null,
-    lng: eventData.lng ?? null,
-    riskIndex: Number(eventData.riskIndex ?? 0),
-    action: eventData.action || '',
+    id: payload.id || crearId('event'),
+    tripId: payload.tripId,
+    driverId: payload.driverId,
+    driverName: payload.driverName,
+    driverEmail: payload.driverEmail,
+    time: payload.time,
+    readableTime: payload.readableTime || new Date(payload.time || Date.now()).toLocaleString('es-MX'),
+    type: payload.type,
+    level: payload.level,
+    delta: payload.delta,
+    duration: payload.duration,
+    durationMs: payload.durationMs,
+    lat: payload.lat,
+    lng: payload.lng,
+    riskIndex: payload.riskIndex,
+    action: payload.action,
+    source: payload.source,
     createdAt: new Date().toISOString(),
   }
 

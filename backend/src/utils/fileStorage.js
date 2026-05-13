@@ -16,6 +16,7 @@ export async function readStorage() {
     const contenido = await readFile(storagePath, 'utf8')
     const data = JSON.parse(contenido)
     return {
+      ...data,
       trips: Array.isArray(data.trips) ? data.trips : [],
       events: Array.isArray(data.events) ? data.events : [],
     }

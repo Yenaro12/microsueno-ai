@@ -1,5 +1,6 @@
 import cors from 'cors'
 import express from 'express'
+import adminRoutes from './routes/adminRoutes.js'
 import eventRoutes from './routes/eventRoutes.js'
 import tripRoutes from './routes/tripRoutes.js'
 
@@ -15,6 +16,7 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/trips', tripRoutes)
 app.use('/api/events', eventRoutes)
+app.use('/api/admin', adminRoutes)
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Ruta no encontrada' })

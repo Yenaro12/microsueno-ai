@@ -1,9 +1,21 @@
 import { useCallback, useState } from 'react'
 import { STORAGE_KEYS } from '../utils/constants'
+import { normalizarConductor } from '../utils/driverIdentity'
 
 const usuarioInicial = {
   nombre: 'Conductor Demo',
   correo: 'conductor@microsueno.ai',
+}
+
+const prepararUsuario = (usuario) => {
+  const conductor = normalizarConductor(usuario)
+  return {
+    ...usuario,
+    id: conductor.driverId,
+    driverId: conductor.driverId,
+    nombre: conductor.driverName,
+    correo: conductor.driverEmail,
+  }
 }
 
 const leerSesionInicial = () => {
@@ -12,7 +24,7 @@ const leerSesionInicial = () => {
     const sesionGuardada = localStorage.getItem(STORAGE_KEYS.SESION_ACTIVA)
     if (usuarioGuardado && sesionGuardada === 'true') {
       return {
-        usuario: JSON.parse(usuarioGuardado),
+        usuario: prepararUsuario(JSON.parse(usuarioGuardado)),
         autenticado: true,
       }
     }
@@ -30,9 +42,10 @@ export function useAuth() {
   const [sesion, setSesion] = useState(leerSesionInicial)
 
   const guardarSesion = useCallback((nuevoUsuario) => {
-    localStorage.setItem(STORAGE_KEYS.USUARIO, JSON.stringify(nuevoUsuario))
+    const usuarioNormalizado = prepararUsuario(nuevoUsuario)
+    localStorage.setItem(STORAGE_KEYS.USUARIO, JSON.stringify(usuarioNormalizado))
     localStorage.setItem(STORAGE_KEYS.SESION_ACTIVA, 'true')
-    setSesion({ usuario: nuevoUsuario, autenticado: true })
+    setSesion({ usuario: usuarioNormalizado, autenticado: true })
   }, [])
 
   const iniciarSesion = useCallback(({ correo, password }) => {

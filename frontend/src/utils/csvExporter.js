@@ -5,6 +5,9 @@ const escaparCSV = (valor) => `"${String(valor ?? '').replaceAll('"', '""')}"`
 export const descargarReporteCSV = (eventos = [], idViaje = 'microsueno-viaje') => {
   const encabezados = [
     'idViaje',
+    'driverId',
+    'driverName',
+    'driverEmail',
     'horaInicioViaje',
     'horaEvento',
     'tipoEvento',
@@ -18,6 +21,9 @@ export const descargarReporteCSV = (eventos = [], idViaje = 'microsueno-viaje') 
   ]
   const filas = eventos.map((evento) => [
     evento.idViaje,
+    evento.driverId,
+    evento.driverName,
+    evento.driverEmail,
     evento.horaInicioViaje,
     evento.fechaHoraEvento || evento.horaEvento,
     evento.tipoEvento,
