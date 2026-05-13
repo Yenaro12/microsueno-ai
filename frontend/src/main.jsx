@@ -1,8 +1,9 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
+import 'leaflet/dist/leaflet.css'
 import App from './App.jsx'
-import './index.css'
+import './styles/global.css'
 
 registerSW({ immediate: true })
 
@@ -11,4 +12,3 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>,
 )
-
