@@ -97,7 +97,7 @@ function AdminPage({ onBackToApp }) {
           <h1>Panel de administrador</h1>
           <p>Supervision de conductores, alertas y estadisticas operativas.</p>
         </div>
-        <button type="button" onClick={onBackToApp}>Volver a app</button>
+        <button type="button" onClick={onBackToApp}>Cerrar Sesión</button>
       </header>
 
       <nav className="admin-tabs">
