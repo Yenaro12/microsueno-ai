@@ -41,6 +41,7 @@ export function useAlarm() {
   const ultimoBeepRef = useRef(0)
   const alarmaDetenidaManualRef = useRef(false)
   const sonidoActivoRef = useRef(true)
+  const alertaManualIntervaloRef = useRef(null)
 
   const [sonidoActivo, setSonidoActivo] = useState(true)
   const [alarmaActiva, setAlarmaActiva] = useState(false)
@@ -101,6 +102,10 @@ export function useAlarm() {
   const detenerAlarma = useCallback(() => {
     ultimoBeepRef.current = 0
     setAlarmaActiva(false)
+    if (alertaManualIntervaloRef.current) {
+      window.clearInterval(alertaManualIntervaloRef.current)
+      alertaManualIntervaloRef.current = null
+    }
     if ('vibrate' in navigator) navigator.vibrate(0)
   }, [])
 
@@ -156,6 +161,21 @@ export function useAlarm() {
     }
   }, [])
 
+  const emitirAlertaEmergencia = useCallback(async () => {
+    await desbloquearAudio()
+    alarmaDetenidaManualRef.current = false
+    setAlarmaActiva(true)
+    emitirBeepAlarma()
+
+    let repeticiones = 0
+    if (alertaManualIntervaloRef.current) window.clearInterval(alertaManualIntervaloRef.current)
+    alertaManualIntervaloRef.current = window.setInterval(() => {
+      repeticiones += 1
+      emitirBeepAlarma()
+      if (repeticiones >= 5) detenerAlarma()
+    }, 360)
+  }, [desbloquearAudio, detenerAlarma, emitirBeepAlarma])
+
   const alternarSonido = useCallback(() => {
     setSonidoActivo((activo) => {
       const nuevoEstado = !activo
@@ -187,6 +207,7 @@ export function useAlarm() {
     alarmaActiva,
     desbloquearAudio,
     controlarAlarma,
+    emitirAlertaEmergencia,
     detenerAlarma,
     detenerAlarmaManual,
     alternarSonido,

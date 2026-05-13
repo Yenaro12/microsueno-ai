@@ -1,4 +1,4 @@
-﻿export const APP_NAME = 'MicroSue\u00f1o AI'
+export const APP_NAME = 'MicroSue\u00f1o AI'
 
 export const FACE_LANDMARKS = {
   INDICE_PUNTO_NARIZ: 1,
@@ -7,10 +7,22 @@ export const FACE_LANDMARKS = {
 export const DETECTION = {
   UMBRAL_DESPLAZAMIENTO_PX: 45,
   FACTOR_RETORNO_NORMAL: 0.55,
-  TIEMPO_RIESGO_MEDIO_MS: 2000,
+  TIEMPO_RIESGO_MEDIO_MS: 1500,
   TIEMPO_RIESGO_ALTO_MS: 2000,
   TIEMPO_ALARMA_FUERTE_MS: 3000,
   INTERVALO_BEEP_ALARMA_MS: 330,
+  TIEMPO_CALIBRACION_MS: 3000,
+  PORCENTAJE_ADVERTENCIA_DESCENSO: 0.12,
+  PORCENTAJE_ALTO_DESCENSO: 0.18,
+  PORCENTAJE_RETORNO_NORMAL: 0.07,
+  VELOCIDAD_DESCENSO_LENTO_PX_S: 8,
+  PUNTAJE_RIESGO_ADVERTENCIA: 32,
+  PUNTAJE_RIESGO_ALARMA: 68,
+  PUNTAJE_RIESGO_MAXIMO: 100,
+}
+
+export const TEMPORARY_CACHE = {
+  INTERVALO_LIMPIEZA_MS: 90_000,
 }
 
 export const MEDIAPIPE = {
@@ -22,6 +34,8 @@ export const MEDIAPIPE = {
 
 export const STORAGE_KEYS = {
   EVENTOS_VIAJE: 'microsueno_eventos_viaje_v1',
+  USUARIO: 'microsueno_usuario_v1',
+  SESION_ACTIVA: 'microsueno_sesion_activa_v1',
 }
 
 export const MAP = {
@@ -46,4 +60,13 @@ export const EVENT_TYPES = {
   CABEZA_ARRIBA: 'Cabeza arriba',
   ROSTRO_PERDIDO: 'Rostro perdido',
   NARIZ_NO_DETECTADA: 'Nariz no detectada',
+  SOMNOLENCIA_PROGRESIVA: 'Somnolencia progresiva',
+  CALIBRACION_COMPLETADA: 'Calibracion inicial completada',
+  POSTURA_RIESGO: 'Postura de riesgo detectada',
+  INICIO_VIAJE: 'Inicio de viaje',
+  FIN_VIAJE: 'Fin de viaje',
+  PANICO: 'Boton de panico',
+  CONEXION_PERDIDA: 'Perdida de conexion',
+  CONEXION_RECUPERADA: 'Recuperacion de conexion',
+  UBICACION_DETECTADA: 'Ubicacion detectada',
 }

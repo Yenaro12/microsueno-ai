@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { STORAGE_KEYS, EVENT_TYPES } from '../utils/constants'
-import { crearId, formatoHora } from '../utils/formatters'
+import { crearId, formatoFechaHora, formatoHora } from '../utils/formatters'
 import { calcularIndiceRiesgo, clasificarRiesgo, obtenerRecomendacion } from '../utils/riskCalculator'
 import { useLocalStorage } from './useLocalStorage'
 import { crearViaje, finalizarViajeBackend } from '../services/tripService'
@@ -56,6 +56,7 @@ export function useTripSession({ ubicacionActual, distanciaKm, onMessage } = {})
       idViaje: idViajeRef.current || idViaje || 'sin-viaje',
       horaInicioViaje: horaInicioViajeRef.current || horaInicioViaje,
       horaEvento: formatoHora(fecha),
+      fechaHoraEvento: formatoFechaHora(fecha),
       fechaEventoISO: fecha.toISOString(),
       tipoEvento: datos.tipoEvento,
       nivel: datos.nivel,

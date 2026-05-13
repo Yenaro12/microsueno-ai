@@ -5,6 +5,13 @@ import { DETECTION, EVENT_TYPES, FACE_LANDMARKS, MEDIAPIPE, RISK_LEVELS, TEXTS }
 const UMBRAL_RETORNO_NORMAL_PX =
   DETECTION.UMBRAL_DESPLAZAMIENTO_PX * DETECTION.FACTOR_RETORNO_NORMAL
 
+const INDICES_OJOS = {
+  izquierdo: { superior: 159, inferior: 145, externo: 33, interno: 133 },
+  derecho: { superior: 386, inferior: 374, externo: 362, interno: 263 },
+}
+
+const distancia = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
+
 export function useFaceDetection({
   registrarEvento,
   actualizarEvento,
@@ -22,11 +29,22 @@ export function useFaceDetection({
   const detectarFrameRef = useRef(null)
   const posicionNarizActualRef = useRef(null)
   const referenciaNarizRef = useRef(null)
+  const referenciaAlturaRostroRef = useRef(null)
+  const calibracionRef = useRef({ activa: false, inicio: 0, muestras: [] })
+  const historialNarizRef = useRef([])
+  const ultimoFrameRiesgoRef = useRef(null)
+  const puntajeRiesgoRef = useRef(0)
   const inicioEventoRef = useRef(null)
   const eventoActualIdRef = useRef(null)
   const tipoEventoActualRef = useRef(null)
   const estadoRiesgoRef = useRef(RISK_LEVELS.BAJO)
   const callbacksRef = useRef({})
+  const marcasEventosRef = useRef({
+    calibracion: false,
+    descenso: false,
+    postura: false,
+    acumulado: false,
+  })
 
   const [camaraActiva, setCamaraActiva] = useState(false)
   const [detectorListo, setDetectorListo] = useState(false)
@@ -39,6 +57,8 @@ export function useFaceDetection({
   const [desplazamientoAbsoluto, setDesplazamientoAbsoluto] = useState(0)
   const [tiempoEventoActual, setTiempoEventoActual] = useState(0)
   const [autocalibracionActiva, setAutocalibracionActiva] = useState(false)
+  const [calibrandoReferencia, setCalibrandoReferencia] = useState(false)
+  const [puntajeRiesgo, setPuntajeRiesgo] = useState(0)
 
   useEffect(() => {
     callbacksRef.current = {
@@ -55,6 +75,30 @@ export function useFaceDetection({
   const actualizarRiesgo = useCallback((riesgo) => {
     estadoRiesgoRef.current = riesgo
     setEstadoRiesgo(riesgo)
+  }, [])
+
+  const registrarEventoSimple = useCallback((nivel, tipoEvento, desplazamiento, duracionMs, accion) => {
+    callbacksRef.current.registrarEvento?.({
+      nivel,
+      tipoEvento,
+      desplazamiento,
+      duracionMs,
+      accion,
+    })
+  }, [])
+
+  const reiniciarCalibracion = useCallback((ahora = performance.now()) => {
+    calibracionRef.current = { activa: true, inicio: ahora, muestras: [] }
+    historialNarizRef.current = []
+    puntajeRiesgoRef.current = 0
+    ultimoFrameRiesgoRef.current = ahora
+    referenciaNarizRef.current = null
+    referenciaAlturaRostroRef.current = null
+    marcasEventosRef.current = { calibracion: false, descenso: false, postura: false, acumulado: false }
+    setPuntajeRiesgo(0)
+    setCalibrandoReferencia(true)
+    setAutocalibracionActiva(false)
+    setTipoActual('Calibrando referencia')
   }, [])
 
   const prepararDetector = useCallback(async () => {
@@ -100,13 +144,57 @@ export function useFaceDetection({
     if (canvas && contexto) contexto.clearRect(0, 0, canvas.width, canvas.height)
   }, [])
 
-  const dibujarNariz = useCallback((puntoNariz) => {
+  const calcularMedidasRostro = useCallback((landmarksCara, canvas) => {
+    const puntos = landmarksCara
+      .filter((punto) => Number.isFinite(punto.x) && Number.isFinite(punto.y))
+      .map((punto) => ({ x: punto.x * canvas.width, y: punto.y * canvas.height }))
+
+    const minX = Math.min(...puntos.map((punto) => punto.x))
+    const maxX = Math.max(...puntos.map((punto) => punto.x))
+    const minY = Math.min(...puntos.map((punto) => punto.y))
+    const maxY = Math.max(...puntos.map((punto) => punto.y))
+    const altura = Math.max(1, maxY - minY)
+
+    const puntoPixel = (indice) => ({
+      x: landmarksCara[indice].x * canvas.width,
+      y: landmarksCara[indice].y * canvas.height,
+    })
+
+    const ojoIzquierdo = INDICES_OJOS.izquierdo
+    const ojoDerecho = INDICES_OJOS.derecho
+    const aperturaIzquierda =
+      distancia(puntoPixel(ojoIzquierdo.superior), puntoPixel(ojoIzquierdo.inferior)) /
+      Math.max(1, distancia(puntoPixel(ojoIzquierdo.externo), puntoPixel(ojoIzquierdo.interno)))
+    const aperturaDerecha =
+      distancia(puntoPixel(ojoDerecho.superior), puntoPixel(ojoDerecho.inferior)) /
+      Math.max(1, distancia(puntoPixel(ojoDerecho.externo), puntoPixel(ojoDerecho.interno)))
+
+    return {
+      minX,
+      maxX,
+      minY,
+      maxY,
+      altura,
+      centroX: (minX + maxX) / 2,
+      ojosCerrados: (aperturaIzquierda + aperturaDerecha) / 2 < 0.16,
+    }
+  }, [])
+
+  const dibujarSeguimiento = useCallback((puntoNariz, medidas, porcentajeDescenso) => {
     const canvas = canvasRef.current
     const contexto = canvas?.getContext('2d')
     if (!canvas || !contexto) return
 
     contexto.clearRect(0, 0, canvas.width, canvas.height)
+
+    if (medidas) {
+      contexto.strokeStyle = 'rgba(56, 189, 248, 0.75)'
+      contexto.lineWidth = 3
+      contexto.strokeRect(medidas.minX, medidas.minY, medidas.maxX - medidas.minX, medidas.maxY - medidas.minY)
+    }
+
     const referencia = referenciaNarizRef.current
+    const alturaRostro = referenciaAlturaRostroRef.current || medidas?.altura || 1
     if (Number.isFinite(referencia)) {
       contexto.setLineDash([12, 10])
       contexto.strokeStyle = 'rgba(34, 197, 94, 0.9)'
@@ -117,15 +205,26 @@ export function useFaceDetection({
       contexto.stroke()
       contexto.setLineDash([])
 
-      contexto.strokeStyle = 'rgba(245, 158, 11, 0.48)'
+      contexto.strokeStyle = 'rgba(245, 158, 11, 0.6)'
       contexto.lineWidth = 2
       contexto.beginPath()
-      contexto.moveTo(0, referencia + DETECTION.UMBRAL_DESPLAZAMIENTO_PX)
-      contexto.lineTo(canvas.width, referencia + DETECTION.UMBRAL_DESPLAZAMIENTO_PX)
-      contexto.moveTo(0, referencia - DETECTION.UMBRAL_DESPLAZAMIENTO_PX)
-      contexto.lineTo(canvas.width, referencia - DETECTION.UMBRAL_DESPLAZAMIENTO_PX)
+      contexto.moveTo(0, referencia + alturaRostro * DETECTION.PORCENTAJE_ADVERTENCIA_DESCENSO)
+      contexto.lineTo(canvas.width, referencia + alturaRostro * DETECTION.PORCENTAJE_ADVERTENCIA_DESCENSO)
+      contexto.stroke()
+
+      contexto.strokeStyle = 'rgba(239, 68, 68, 0.68)'
+      contexto.beginPath()
+      contexto.moveTo(0, referencia + alturaRostro * DETECTION.PORCENTAJE_ALTO_DESCENSO)
+      contexto.lineTo(canvas.width, referencia + alturaRostro * DETECTION.PORCENTAJE_ALTO_DESCENSO)
       contexto.stroke()
     }
+
+    contexto.strokeStyle = 'rgba(255, 255, 255, 0.9)'
+    contexto.lineWidth = 3
+    contexto.beginPath()
+    contexto.moveTo(puntoNariz.x, medidas?.minY ?? 0)
+    contexto.lineTo(puntoNariz.x, puntoNariz.y)
+    contexto.stroke()
 
     contexto.fillStyle =
       estadoRiesgoRef.current === RISK_LEVELS.ALTO
@@ -139,16 +238,51 @@ export function useFaceDetection({
     contexto.arc(puntoNariz.x, puntoNariz.y, 13, 0, Math.PI * 2)
     contexto.fill()
     contexto.stroke()
+
+    contexto.fillStyle = 'rgba(15, 23, 42, 0.74)'
+    contexto.fillRect(12, 12, 210, 48)
+    contexto.fillStyle = '#f8fafc'
+    contexto.font = 'bold 20px system-ui, sans-serif'
+    contexto.fillText(`Riesgo ${Math.round(puntajeRiesgoRef.current)}/100`, 24, 42)
+    if (Number.isFinite(porcentajeDescenso)) {
+      contexto.font = '14px system-ui, sans-serif'
+      contexto.fillText(`Descenso ${(porcentajeDescenso * 100).toFixed(0)}%`, 24, 57)
+    }
   }, [])
 
-  const actualizarReferenciaSuave = useCallback((posicionY) => {
+  const actualizarPuntaje = useCallback((deltaPuntaje, ahora) => {
+    const previo = ultimoFrameRiesgoRef.current ?? ahora
+    const segundos = Math.min(0.12, Math.max(0.016, (ahora - previo) / 1000))
+    ultimoFrameRiesgoRef.current = ahora
+    const nuevo = Math.max(
+      0,
+      Math.min(DETECTION.PUNTAJE_RIESGO_MAXIMO, puntajeRiesgoRef.current + deltaPuntaje * segundos),
+    )
+    puntajeRiesgoRef.current = nuevo
+    setPuntajeRiesgo(nuevo)
+    return nuevo
+  }, [])
+
+  const actualizarReferenciaSuave = useCallback((posicionY, alturaRostro, velocidadDescenso, porcentajeDescenso) => {
     const referencia = referenciaNarizRef.current
-    if (!Number.isFinite(referencia) || estadoRiesgoRef.current !== RISK_LEVELS.BAJO) {
+    const referenciaAltura = referenciaAlturaRostroRef.current
+    const puedeAjustar =
+      Number.isFinite(referencia) &&
+      Number.isFinite(referenciaAltura) &&
+      estadoRiesgoRef.current === RISK_LEVELS.BAJO &&
+      puntajeRiesgoRef.current < 8 &&
+      Math.abs(porcentajeDescenso) < 0.04 &&
+      Math.abs(velocidadDescenso) < 5
+
+    if (!puedeAjustar) {
       setAutocalibracionActiva(false)
       return
     }
-    const nuevaReferencia = referencia * 0.98 + posicionY * 0.02
+
+    const nuevaReferencia = referencia * 0.995 + posicionY * 0.005
+    const nuevaAltura = referenciaAltura * 0.995 + alturaRostro * 0.005
     referenciaNarizRef.current = nuevaReferencia
+    referenciaAlturaRostroRef.current = nuevaAltura
     setReferenciaNarizY(nuevaReferencia)
     setAutocalibracionActiva(true)
   }, [])
@@ -184,6 +318,9 @@ export function useFaceDetection({
     inicioEventoRef.current = null
     eventoActualIdRef.current = null
     tipoEventoActualRef.current = null
+    marcasEventosRef.current.descenso = false
+    marcasEventosRef.current.postura = false
+    marcasEventosRef.current.acumulado = false
     setTiempoEventoActual(0)
     setTipoActual('Normal')
     callbacksRef.current.resetBloqueoManual?.()
@@ -202,11 +339,13 @@ export function useFaceDetection({
 
   const evaluarPerdidaDeteccion = useCallback((tipoEvento, ahora) => {
     setAutocalibracionActiva(false)
+    setCalibrandoReferencia(false)
     setTipoActual(tipoEvento)
     setDeltaY(0)
     setDesplazamientoAbsoluto(0)
     const duracion = iniciarOContinuarEvento(tipoEvento, ahora)
     setTiempoEventoActual(duracion)
+    actualizarPuntaje(55, ahora)
 
     if (duracion >= DETECTION.TIEMPO_ALARMA_FUERTE_MS) {
       actualizarRiesgo(RISK_LEVELS.ALTO)
@@ -231,19 +370,64 @@ export function useFaceDetection({
         0,
         duracion,
         tipoEvento === EVENT_TYPES.ROSTRO_PERDIDO
-          ? 'Rostro no detectado por mas de 2 s'
-          : 'Nariz no detectada por mas de 2 s',
+          ? 'Rostro no detectado por mas de 1.5 s'
+          : 'Nariz no detectada por mas de 1.5 s',
       )
     } else {
       actualizarRiesgo(RISK_LEVELS.BAJO)
     }
     callbacksRef.current.controlarAlarma?.(false, ahora)
-  }, [actualizarRiesgo, iniciarOContinuarEvento, registrarEventoSiHaceFalta])
+  }, [actualizarPuntaje, actualizarRiesgo, iniciarOContinuarEvento, registrarEventoSiHaceFalta])
 
-  const evaluarMovimientoCabeza = useCallback((posicionY, ahora) => {
+  const finalizarCalibracionSiLista = useCallback((posicionY, medidas, ahora) => {
+    const calibracion = calibracionRef.current
+    if (!calibracion.activa) return false
+
+    calibracion.muestras.push({ y: posicionY, altura: medidas.altura })
+    setTipoActual('Calibrando referencia')
+    setCalibrandoReferencia(true)
+
+    if (ahora - calibracion.inicio < DETECTION.TIEMPO_CALIBRACION_MS) return true
+
+    const promedioY =
+      calibracion.muestras.reduce((total, muestra) => total + muestra.y, 0) /
+      Math.max(1, calibracion.muestras.length)
+    const promedioAltura =
+      calibracion.muestras.reduce((total, muestra) => total + muestra.altura, 0) /
+      Math.max(1, calibracion.muestras.length)
+
+    referenciaNarizRef.current = promedioY
+    referenciaAlturaRostroRef.current = promedioAltura
+    calibracionRef.current = { activa: false, inicio: 0, muestras: [] }
+    setReferenciaNarizY(promedioY)
+    setCalibrandoReferencia(false)
+    setTipoActual('Referencia calibrada')
+    callbacksRef.current.onMessage?.('Calibracion inicial completada. Monitoreo activo.')
+
+    if (!marcasEventosRef.current.calibracion) {
+      registrarEventoSimple(
+        RISK_LEVELS.BAJO,
+        EVENT_TYPES.CALIBRACION_COMPLETADA,
+        0,
+        DETECTION.TIEMPO_CALIBRACION_MS,
+        'Calibracion inicial de rostro y nariz completada',
+      )
+      marcasEventosRef.current.calibracion = true
+    }
+    return true
+  }, [registrarEventoSimple])
+
+  const evaluarMovimientoCabeza = useCallback((posicionY, ahora, medidas) => {
+    if (finalizarCalibracionSiLista(posicionY, medidas, ahora)) {
+      dibujarSeguimiento({ x: medidas.centroX, y: posicionY }, medidas, 0)
+      return
+    }
+
     const referencia = referenciaNarizRef.current
-    if (!Number.isFinite(referencia)) {
+    const alturaReferencia = referenciaAlturaRostroRef.current || medidas.altura
+    if (!Number.isFinite(referencia) || !Number.isFinite(alturaReferencia)) {
       referenciaNarizRef.current = posicionY
+      referenciaAlturaRostroRef.current = medidas.altura
       setReferenciaNarizY(posicionY)
       actualizarRiesgo(RISK_LEVELS.BAJO)
       setTipoActual('Referencia inicial')
@@ -252,63 +436,130 @@ export function useFaceDetection({
 
     const nuevoDeltaY = posicionY - referencia
     const absoluto = Math.abs(nuevoDeltaY)
+    const porcentajeDescenso = nuevoDeltaY / Math.max(1, alturaReferencia)
     const tipoEvento = nuevoDeltaY >= 0 ? EVENT_TYPES.CABEZA_ABAJO : EVENT_TYPES.CABEZA_ARRIBA
+
+    historialNarizRef.current = [...historialNarizRef.current, { y: posicionY, t: ahora }].filter(
+      (muestra) => ahora - muestra.t <= 1400,
+    )
+    const primeraMuestra = historialNarizRef.current[0]
+    const segundosHistorial = primeraMuestra ? Math.max(0.2, (ahora - primeraMuestra.t) / 1000) : 1
+    const velocidadDescenso = primeraMuestra ? (posicionY - primeraMuestra.y) / segundosHistorial : 0
+
+    const descensoAdvertencia = porcentajeDescenso >= DETECTION.PORCENTAJE_ADVERTENCIA_DESCENSO
+    const descensoAlto = porcentajeDescenso >= DETECTION.PORCENTAJE_ALTO_DESCENSO || nuevoDeltaY >= DETECTION.UMBRAL_DESPLAZAMIENTO_PX
+    const cabezaArribaAlto = porcentajeDescenso <= -DETECTION.PORCENTAJE_ALTO_DESCENSO || nuevoDeltaY <= -DETECTION.UMBRAL_DESPLAZAMIENTO_PX
+    const descensoProgresivo =
+      velocidadDescenso >= DETECTION.VELOCIDAD_DESCENSO_LENTO_PX_S &&
+      porcentajeDescenso >= 0.05
+    const ojosCerrados = medidas.ojosCerrados
+
+    let cambioPuntaje = -22
+    if (descensoAlto || cabezaArribaAlto) cambioPuntaje = 38
+    else if (descensoAdvertencia) cambioPuntaje = 26
+    else if (descensoProgresivo) cambioPuntaje = 18
+    if (ojosCerrados && (descensoAdvertencia || descensoProgresivo)) cambioPuntaje += 14
+
+    const nuevoPuntaje = actualizarPuntaje(cambioPuntaje, ahora)
 
     setDeltaY(nuevoDeltaY)
     setDesplazamientoAbsoluto(absoluto)
+    dibujarSeguimiento({ x: medidas.centroX, y: posicionY }, medidas, porcentajeDescenso)
 
-    if (absoluto <= UMBRAL_RETORNO_NORMAL_PX) {
+    const retornoNormal =
+      Math.abs(porcentajeDescenso) <= DETECTION.PORCENTAJE_RETORNO_NORMAL &&
+      absoluto <= UMBRAL_RETORNO_NORMAL_PX &&
+      nuevoPuntaje < 14
+
+    if (retornoNormal) {
       finalizarEventoActual(ahora)
       actualizarRiesgo(RISK_LEVELS.BAJO)
-      actualizarReferenciaSuave(posicionY)
-      return
-    }
-
-    if (absoluto <= DETECTION.UMBRAL_DESPLAZAMIENTO_PX) {
-      finalizarEventoActual(ahora)
-      actualizarRiesgo(RISK_LEVELS.BAJO)
-      actualizarReferenciaSuave(posicionY)
+      actualizarReferenciaSuave(posicionY, medidas.altura, velocidadDescenso, porcentajeDescenso)
+      callbacksRef.current.controlarAlarma?.(false, ahora)
       return
     }
 
     setAutocalibracionActiva(false)
-    setTipoActual(tipoEvento)
-    const duracion = iniciarOContinuarEvento(tipoEvento, ahora)
-    setTiempoEventoActual(duracion)
 
-    if (duracion >= DETECTION.TIEMPO_ALARMA_FUERTE_MS) {
+    if (descensoProgresivo && !marcasEventosRef.current.descenso) {
+      registrarEventoSimple(
+        RISK_LEVELS.MEDIO,
+        EVENT_TYPES.SOMNOLENCIA_PROGRESIVA,
+        nuevoDeltaY,
+        0,
+        'Nariz descendiendo progresivamente',
+      )
+      marcasEventosRef.current.descenso = true
+    }
+
+    const hayRiesgo = descensoAdvertencia || descensoAlto || cabezaArribaAlto || descensoProgresivo || nuevoPuntaje >= DETECTION.PUNTAJE_RIESGO_ADVERTENCIA
+    const eventoRiesgo =
+      nuevoPuntaje >= DETECTION.PUNTAJE_RIESGO_ADVERTENCIA || descensoProgresivo
+        ? EVENT_TYPES.SOMNOLENCIA_PROGRESIVA
+        : tipoEvento
+
+    if (!hayRiesgo) {
+      actualizarRiesgo(RISK_LEVELS.BAJO)
+      callbacksRef.current.controlarAlarma?.(false, ahora)
+      return
+    }
+
+    const duracion = iniciarOContinuarEvento(eventoRiesgo, ahora)
+    setTiempoEventoActual(duracion)
+    setTipoActual(eventoRiesgo)
+
+    if ((descensoAdvertencia || descensoProgresivo) && !marcasEventosRef.current.postura && duracion > 600) {
+      registrarEventoSimple(
+        RISK_LEVELS.MEDIO,
+        EVENT_TYPES.POSTURA_RIESGO,
+        nuevoDeltaY,
+        duracion,
+        'Postura de riesgo detectada por nariz y rostro',
+      )
+      marcasEventosRef.current.postura = true
+    }
+
+    const debeAlarmarPorPostura = (descensoAlto || cabezaArribaAlto) && duracion >= DETECTION.TIEMPO_RIESGO_ALTO_MS
+    const debeAlarmarPorAcumulado = nuevoPuntaje >= DETECTION.PUNTAJE_RIESGO_ALARMA
+    const debeAlarmarPorGradual = descensoProgresivo && duracion >= DETECTION.TIEMPO_ALARMA_FUERTE_MS
+
+    if (debeAlarmarPorPostura || debeAlarmarPorAcumulado || debeAlarmarPorGradual) {
       actualizarRiesgo(RISK_LEVELS.ALTO)
       registrarEventoSiHaceFalta(
         RISK_LEVELS.ALARMA,
-        tipoEvento,
+        debeAlarmarPorAcumulado ? EVENT_TYPES.SOMNOLENCIA_PROGRESIVA : tipoEvento,
         nuevoDeltaY,
         duracion,
-        tipoEvento === EVENT_TYPES.CABEZA_ABAJO
-          ? 'Alarma fuerte por cabeza abajo'
-          : 'Alarma fuerte por cabeza arriba',
+        debeAlarmarPorAcumulado
+          ? 'Alarma activada por somnolencia gradual y riesgo acumulado alto'
+          : tipoEvento === EVENT_TYPES.CABEZA_ABAJO
+            ? 'Microsueno detectado por descenso sostenido de nariz'
+            : 'Alarma fuerte por cabeza arriba',
       )
+      if (debeAlarmarPorAcumulado && !marcasEventosRef.current.acumulado) {
+        registrarEventoSimple(
+          RISK_LEVELS.ALARMA,
+          EVENT_TYPES.SOMNOLENCIA_PROGRESIVA,
+          nuevoDeltaY,
+          duracion,
+          'Riesgo acumulado alto por somnolencia progresiva',
+        )
+        marcasEventosRef.current.acumulado = true
+      }
       callbacksRef.current.controlarAlarma?.(true, ahora)
       return
     }
 
-    if (duracion >= DETECTION.TIEMPO_RIESGO_ALTO_MS) {
-      actualizarRiesgo(RISK_LEVELS.ALTO)
-      registrarEventoSiHaceFalta(
-        RISK_LEVELS.ALTO,
-        tipoEvento,
-        nuevoDeltaY,
-        duracion,
-        tipoEvento === EVENT_TYPES.CABEZA_ABAJO
-          ? 'Riesgo alto por cabeza abajo'
-          : 'Riesgo alto por cabeza arriba',
-      )
-      callbacksRef.current.controlarAlarma?.(true, ahora)
-      return
-    }
-
-    actualizarRiesgo(RISK_LEVELS.BAJO)
+    actualizarRiesgo(RISK_LEVELS.MEDIO)
+    registrarEventoSiHaceFalta(
+      RISK_LEVELS.MEDIO,
+      eventoRiesgo,
+      nuevoDeltaY,
+      duracion,
+      descensoProgresivo ? 'Nariz descendiendo lentamente; acumulando riesgo' : 'Postura de riesgo detectada',
+    )
     callbacksRef.current.controlarAlarma?.(false, ahora)
-  }, [actualizarReferenciaSuave, actualizarRiesgo, finalizarEventoActual, iniciarOContinuarEvento, registrarEventoSiHaceFalta])
+  }, [actualizarPuntaje, actualizarReferenciaSuave, actualizarRiesgo, dibujarSeguimiento, finalizarCalibracionSiLista, finalizarEventoActual, iniciarOContinuarEvento, registrarEventoSiHaceFalta, registrarEventoSimple])
 
   const detectarEnVideo = useCallback((detector) => {
     const video = videoRef.current
@@ -341,6 +592,7 @@ export function useFaceDetection({
       return
     }
 
+    const medidas = calcularMedidasRostro(landmarksCara, canvas)
     const posicionNariz = {
       x: puntoNariz.x * canvas.width,
       y: puntoNariz.y * canvas.height,
@@ -348,10 +600,9 @@ export function useFaceDetection({
 
     posicionNarizActualRef.current = posicionNariz
     setPosicionNarizY(posicionNariz.y)
-    evaluarMovimientoCabeza(posicionNariz.y, ahora)
-    dibujarNariz(posicionNariz)
+    evaluarMovimientoCabeza(posicionNariz.y, ahora, medidas)
     animacionRef.current = requestAnimationFrame(() => detectarFrameRef.current?.(detector))
-  }, [dibujarNariz, evaluarMovimientoCabeza, evaluarPerdidaDeteccion, limpiarCanvas, sincronizarCanvas])
+  }, [calcularMedidasRostro, evaluarMovimientoCabeza, evaluarPerdidaDeteccion, limpiarCanvas, sincronizarCanvas])
 
   useEffect(() => {
     detectarFrameRef.current = detectarEnVideo
@@ -374,8 +625,9 @@ export function useFaceDetection({
       videoRef.current.srcObject = flujo
       await videoRef.current.play()
       sincronizarCanvas()
+      reiniciarCalibracion(performance.now())
       setCamaraActiva(true)
-      callbacksRef.current.onMessage?.('Camara activa. Mantente dentro del encuadre.')
+      callbacksRef.current.onMessage?.('Camara activa. Mantente normal unos segundos para calibrar.')
       detectarEnVideo(detector)
       return true
     } catch (error) {
@@ -384,7 +636,7 @@ export function useFaceDetection({
       console.error(error)
       return false
     }
-  }, [detectarEnVideo, prepararDetector, sincronizarCanvas])
+  }, [detectarEnVideo, prepararDetector, reiniciarCalibracion, sincronizarCanvas])
 
   const detenerCamara = useCallback(() => {
     if (animacionRef.current) {
@@ -403,15 +655,10 @@ export function useFaceDetection({
       callbacksRef.current.onMessage?.('Aun no detecto la nariz. Mantente de frente a la camara.')
       return
     }
-    referenciaNarizRef.current = posicionActual.y
-    setReferenciaNarizY(posicionActual.y)
-    setDeltaY(0)
-    setDesplazamientoAbsoluto(0)
-    setTiempoEventoActual(0)
-    setTipoActual('Referencia calibrada')
+    reiniciarCalibracion(performance.now())
     callbacksRef.current.resetBloqueoManual?.()
     callbacksRef.current.detenerAlarma?.()
-  }, [])
+  }, [reiniciarCalibracion])
 
   const marcarAlarmaDetenidaManual = useCallback(() => {
     if (eventoActualIdRef.current) {
@@ -442,6 +689,8 @@ export function useFaceDetection({
     desplazamientoAbsoluto,
     tiempoEventoActual,
     autocalibracionActiva,
+    calibrandoReferencia,
+    puntajeRiesgo,
     iniciarCamara,
     detenerCamara,
     recalibrarManual,
@@ -450,4 +699,3 @@ export function useFaceDetection({
     textoEncuadre: TEXTS.ENCUADRE,
   }
 }
-

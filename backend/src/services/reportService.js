@@ -7,6 +7,7 @@ export async function saveEvent(eventData) {
     id: eventData.id || crearId('event'),
     tripId: eventData.tripId || 'sin-viaje',
     time: eventData.time || new Date().toISOString(),
+    readableTime: eventData.readableTime || new Date(eventData.time || Date.now()).toLocaleString('es-MX'),
     type: eventData.type,
     level: eventData.level,
     delta: Number(eventData.delta ?? 0),

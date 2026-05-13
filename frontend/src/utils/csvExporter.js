@@ -1,4 +1,4 @@
-﻿import { formatoNumero } from './formatters'
+import { formatoNumero } from './formatters'
 
 const escaparCSV = (valor) => `"${String(valor ?? '').replaceAll('"', '""')}"`
 
@@ -19,7 +19,7 @@ export const descargarReporteCSV = (eventos = [], idViaje = 'microsueno-viaje') 
   const filas = eventos.map((evento) => [
     evento.idViaje,
     evento.horaInicioViaje,
-    evento.horaEvento,
+    evento.fechaHoraEvento || evento.horaEvento,
     evento.tipoEvento,
     evento.nivel,
     formatoNumero(evento.desplazamiento, 1),

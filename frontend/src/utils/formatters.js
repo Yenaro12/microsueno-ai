@@ -1,4 +1,4 @@
-﻿export const formatoNumero = (valor, decimales = 1) =>
+export const formatoNumero = (valor, decimales = 1) =>
   Number.isFinite(valor) ? Number(valor).toFixed(decimales) : '--'
 
 export const formatoTiempo = (milisegundos) => {
@@ -13,6 +13,16 @@ export const formatoDuracionEvento = (milisegundos) =>
 
 export const formatoHora = (fecha = new Date()) =>
   fecha.toLocaleTimeString('es-MX', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+
+export const formatoFechaHora = (fecha = new Date()) =>
+  fecha.toLocaleString('es-MX', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',

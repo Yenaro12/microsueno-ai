@@ -1,22 +1,44 @@
-import { useState } from 'react'
-import AlarmControls from './components/AlarmControls'
-import CameraMonitor from './components/CameraMonitor'
-import EventsTable from './components/EventsTable'
+import { useEffect, useRef, useState } from 'react'
+import AppNavbar from './components/AppNavbar'
+import BottomActionBar from './components/BottomActionBar'
+import DetectionService from './components/DetectionService'
+import LoginView from './components/LoginView'
 import MapView from './components/MapView'
-import MetricsPanel from './components/MetricsPanel'
-import RiskStatus from './components/RiskStatus'
-import TripAnalysis from './components/TripAnalysis'
-import TripControls from './components/TripControls'
+import RegisterView from './components/RegisterView'
+import RouteModal from './components/RouteModal'
+import TechnicalPanel from './components/TechnicalPanel'
+import UserProfile from './components/UserProfile'
 import { useAlarm } from './hooks/useAlarm'
+import { useAuth } from './hooks/useAuth'
+import { useConnectionStatus } from './hooks/useConnectionStatus'
 import { useFaceDetection } from './hooks/useFaceDetection'
 import { useGeolocation } from './hooks/useGeolocation'
+import { useRoutePlanner } from './hooks/useRoutePlanner'
+import { useTemporaryCacheCleanup } from './hooks/useTemporaryCacheCleanup'
 import { useTripSession } from './hooks/useTripSession'
-import { APP_NAME, TEXTS } from './utils/constants'
+import { EVENT_TYPES, RISK_LEVELS } from './utils/constants'
 import { descargarReporteCSV } from './utils/csvExporter'
-import { formatoNumero } from './utils/formatters'
 
 function App() {
-  const [mensajeSistema, setMensajeSistema] = useState('Inicia viaje para activar GPS y camara.')
+  const auth = useAuth()
+  const [vistaAuth, setVistaAuth] = useState('login')
+
+  if (!auth.autenticado) {
+    return vistaAuth === 'registro' ? (
+      <RegisterView onRegister={auth.registrarUsuario} onGoLogin={() => setVistaAuth('login')} />
+    ) : (
+      <LoginView onLogin={auth.iniciarSesion} onGoRegister={() => setVistaAuth('registro')} />
+    )
+  }
+
+  return <AuthenticatedApp auth={auth} />
+}
+
+function AuthenticatedApp({ auth }) {
+  const [mensajeSistema, setMensajeSistema] = useState('Listo para iniciar viaje. El boton Iniciar viaje activa camara, audio y GPS.')
+  const [vista, setVista] = useState('mapa')
+  const [rutaAbierta, setRutaAbierta] = useState(false)
+  const ubicacionRegistradaRef = useRef(false)
 
   const alarma = useAlarm()
   const { setAudioRespaldoNode, audioRespaldoSrc } = alarma
@@ -24,6 +46,10 @@ function App() {
   const viaje = useTripSession({
     ubicacionActual: geolocalizacion.ubicacionActual,
     distanciaKm: geolocalizacion.distanciaKm,
+    onMessage: setMensajeSistema,
+  })
+  const conexion = useConnectionStatus({
+    registrarEvento: viaje.registrarEvento,
     onMessage: setMensajeSistema,
   })
   const deteccion = useFaceDetection({
@@ -35,25 +61,102 @@ function App() {
     desbloquearAudio: alarma.desbloquearAudio,
     onMessage: setMensajeSistema,
   })
+  const ruta = useRoutePlanner({
+    ubicacionActual: geolocalizacion.ubicacionActual,
+    onMessage: setMensajeSistema,
+  })
+  const limpiezaTemporal = useTemporaryCacheCleanup({
+    activo: deteccion.camaraActiva || viaje.viajeActivo,
+    canvasRef: deteccion.canvasRef,
+  })
 
   const analisisViaje = viaje.obtenerAnalisisViaje(deteccion.tiempoEventoActual)
 
+  useEffect(() => {
+    if (!viaje.viajeActivo) {
+      ubicacionRegistradaRef.current = false
+      return
+    }
+
+    if (geolocalizacion.ubicacionActual && !ubicacionRegistradaRef.current) {
+      viaje.registrarEvento({
+        tipoEvento: EVENT_TYPES.UBICACION_DETECTADA,
+        nivel: RISK_LEVELS.BAJO,
+        desplazamiento: 0,
+        duracionMs: 0,
+        accion: 'Ubicacion GPS detectada para el viaje',
+      })
+      ubicacionRegistradaRef.current = true
+    }
+  }, [geolocalizacion.ubicacionActual, viaje])
+
+  const activarMonitoreoCamara = async () => {
+    if (deteccion.camaraActiva) return true
+
+    setMensajeSistema('Activando camara y monitoreo facial...')
+    await alarma.desbloquearAudio()
+    const camaraOk = await deteccion.iniciarCamara()
+
+    if (!camaraOk) {
+      setMensajeSistema('No se pudo activar la camara. Permite acceso a camara y usa localhost o HTTPS.')
+      return false
+    }
+
+    setMensajeSistema('Camara activa. Monitoreo de microsueno en ejecucion.')
+    return true
+  }
+
   const iniciarViaje = async () => {
+    if (viaje.viajeActivo) {
+      await activarMonitoreoCamara()
+      return
+    }
+
+    const camaraOk = await activarMonitoreoCamara()
+    if (!camaraOk) return
+
     await viaje.iniciarViaje({
       desbloquearAudio: alarma.desbloquearAudio,
       iniciarSeguimientoGps: geolocalizacion.iniciarSeguimientoGps,
-      iniciarCamara: deteccion.iniciarCamara,
+      iniciarCamara: async () => true,
       resetRuta: geolocalizacion.resetRuta,
     })
+    viaje.registrarEvento({
+      tipoEvento: EVENT_TYPES.INICIO_VIAJE,
+      nivel: RISK_LEVELS.BAJO,
+      desplazamiento: 0,
+      duracionMs: 0,
+      accion: 'Viaje iniciado por el conductor con monitoreo facial activo',
+    })
+    setMensajeSistema('Viaje iniciado. Monitoreo facial y GPS activos.')
   }
 
-  const finalizarViaje = async () => {
+  const terminarViaje = async () => {
+    viaje.registrarEvento({
+      tipoEvento: EVENT_TYPES.FIN_VIAJE,
+      nivel: RISK_LEVELS.BAJO,
+      desplazamiento: 0,
+      duracionMs: 0,
+      accion: 'Viaje terminado por el conductor',
+    })
     await viaje.finalizarViaje({
       detenerSeguimientoGps: geolocalizacion.detenerSeguimientoGps,
       detenerAlarma: alarma.detenerAlarma,
       finalizarEventoActual: deteccion.finalizarEventoActual,
       tiempoEventoActual: deteccion.tiempoEventoActual,
     })
+  }
+
+  const activarPanico = async () => {
+    await alarma.emitirAlertaEmergencia()
+    viaje.registrarEvento({
+      tipoEvento: EVENT_TYPES.PANICO,
+      nivel: RISK_LEVELS.ALARMA,
+      desplazamiento: 0,
+      duracionMs: 0,
+      accion: 'Alerta critica activada desde boton de panico',
+    })
+    setMensajeSistema('Boton de panico activado. Evento critico registrado.')
   }
 
   const detenerAlarmaManual = () => {
@@ -66,88 +169,87 @@ function App() {
     descargarReporteCSV(viaje.eventosDetectados, viaje.idViaje)
   }
 
-  return (
-    <main className="aplicacion">
-      <header className="barra-superior">
-        <div>
-          <p className="etiqueta">GPS inteligente para transporte</p>
-          <h1>{APP_NAME}</h1>
-        </div>
-        <RiskStatus estadoRiesgo={deteccion.estadoRiesgo} alarmaActiva={alarma.alarmaActiva} />
-      </header>
+  const volverAlMapa = () => setVista('mapa')
 
-      <section className="tablero-viaje">
-        <section className="tarjeta mapa-panel">
-          <div className="titulo-panel">
-            <div>
-              <h2>Ruta en tiempo real</h2>
-              <span>{viaje.viajeActivo ? 'Viaje activo' : 'Viaje detenido'}</span>
-            </div>
-            <strong>{formatoNumero(analisisViaje.kilometros, 2)} km</strong>
-          </div>
+  let vistaActual
+  if (vista === 'perfil') {
+    vistaActual = (
+      <UserProfile
+        usuario={auth.usuario}
+        onBack={volverAlMapa}
+        onOpenTechnical={() => setVista('tecnico')}
+        onLogout={auth.cerrarSesion}
+      />
+    )
+  } else if (vista === 'tecnico') {
+    vistaActual = (
+      <TechnicalPanel
+        mensajeSistema={mensajeSistema}
+        deteccion={deteccion}
+        alarma={alarma}
+        analisisViaje={analisisViaje}
+        eventos={viaje.eventosDetectados}
+        limpiezaTemporal={limpiezaTemporal}
+        onBack={volverAlMapa}
+        onDetenerAlarma={detenerAlarmaManual}
+        onDescargarReporte={descargarReporte}
+      />
+    )
+  } else {
+    vistaActual = (
+      <main className="driver-app">
+        <AppNavbar
+          conectado={conexion.conectado}
+          ubicacionActual={geolocalizacion.ubicacionActual}
+          usuario={auth.usuario}
+          onAbrirRuta={() => setRutaAbierta(true)}
+          onAbrirPerfil={() => setVista('perfil')}
+        />
+
+        <section className="driver-map-area" aria-label="Mapa de navegacion del viaje">
+          <div className={`driver-toast ${deteccion.camaraActiva ? 'ok' : 'alerta'}`}>{mensajeSistema}</div>
           <MapView
             ubicacionActual={geolocalizacion.ubicacionActual}
             rutaRecorrida={geolocalizacion.rutaRecorrida}
             eventos={viaje.eventosDetectados}
             centrarMapaToken={geolocalizacion.centrarMapaToken}
+            origenRuta={ruta.origenRuta}
+            destinoRuta={ruta.destinoRuta}
+            rutaPlanificada={ruta.rutaPlanificada}
+            centrarRutaToken={ruta.centrarRutaToken}
           />
         </section>
 
-        <section className="panel-operacion">
-          <CameraMonitor
-            videoRef={deteccion.videoRef}
-            canvasRef={deteccion.canvasRef}
-            camaraActiva={deteccion.camaraActiva}
-            alarmaActiva={alarma.alarmaActiva}
-            textoEncuadre={deteccion.textoEncuadre}
-          />
+        <BottomActionBar
+          viajeActivo={viaje.viajeActivo}
+          camaraActiva={deteccion.camaraActiva}
+          cargandoDetector={deteccion.cargandoDetector}
+          onIniciarViaje={iniciarViaje}
+          onTerminarViaje={terminarViaje}
+          onPanic={activarPanico}
+        />
 
-          <TripControls
-            viajeActivo={viaje.viajeActivo}
-            camaraActiva={deteccion.camaraActiva}
-            cargandoDetector={deteccion.cargandoDetector}
-            hayEventos={viaje.eventosDetectados.length > 0}
-            onIniciarViaje={iniciarViaje}
-            onFinalizarViaje={finalizarViaje}
-            onCentrarMapa={geolocalizacion.centrarMapa}
-            onIniciarCamara={deteccion.iniciarCamara}
-            onRecalibrar={deteccion.recalibrarManual}
-            onDescargarReporte={descargarReporte}
-          />
+        {rutaAbierta && <RouteModal ruta={ruta} onClose={() => setRutaAbierta(false)} />}
+      </main>
+    )
+  }
 
-          <AlarmControls
-            sonidoActivo={alarma.sonidoActivo}
-            onAlternarSonido={alarma.alternarSonido}
-            onDetenerAlarma={detenerAlarmaManual}
-          />
-
-          <section className="tarjeta estado-sistema">
-            <p>{mensajeSistema}</p>
-            <small>{TEXTS.PWA_ANDROID}</small>
-            <small>{TEXTS.ENCUADRE}</small>
-            {deteccion.autocalibracionActiva && <small>Autocalibracion activa</small>}
-          </section>
-        </section>
-      </section>
-
-      <MetricsPanel
-        detectorListo={deteccion.detectorListo}
+  return (
+    <>
+      <DetectionService
+        videoRef={deteccion.videoRef}
+        canvasRef={deteccion.canvasRef}
+        visible={vista === 'mapa'}
+        camaraActiva={deteccion.camaraActiva}
+        estadoRiesgo={deteccion.estadoRiesgo}
         tipoActual={deteccion.tipoActual}
-        deltaY={deteccion.deltaY}
-        desplazamientoAbsoluto={deteccion.desplazamientoAbsoluto}
-        tiempoEventoActual={deteccion.tiempoEventoActual}
-        posicionNarizY={deteccion.posicionNarizY}
+        puntajeRiesgo={deteccion.puntajeRiesgo}
+        calibrandoReferencia={deteccion.calibrandoReferencia}
       />
-
-      <TripAnalysis analisisViaje={analisisViaje} />
-      <EventsTable eventos={viaje.eventosDetectados} />
-
+      {vistaActual}
       <audio ref={setAudioRespaldoNode} src={audioRespaldoSrc} preload="auto" />
-    </main>
+    </>
   )
 }
 
 export default App
-
-
-

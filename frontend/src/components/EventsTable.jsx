@@ -35,7 +35,7 @@ function EventsTable({ eventos }) {
             ) : (
               eventos.map((evento) => (
                 <tr key={evento.id}>
-                  <td>{evento.horaEvento}</td>
+                  <td>{evento.fechaHoraEvento || evento.horaEvento}</td>
                   <td>{evento.tipoEvento}</td>
                   <td>
                     <span className={`chip-alerta ${evento.nivel}`}>{evento.nivel}</span>

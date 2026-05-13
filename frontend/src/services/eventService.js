@@ -1,4 +1,4 @@
-﻿import { apiRequest } from './apiClient'
+import { apiRequest } from './apiClient'
 
 export const guardarEventoBackend = (evento) =>
   apiRequest('/events', {
@@ -7,6 +7,7 @@ export const guardarEventoBackend = (evento) =>
       id: evento.id,
       tripId: evento.idViaje,
       time: evento.fechaEventoISO,
+      readableTime: evento.fechaHoraEvento || evento.horaEvento,
       type: evento.tipoEvento,
       level: String(evento.nivel || '').toUpperCase(),
       delta: evento.desplazamiento,
